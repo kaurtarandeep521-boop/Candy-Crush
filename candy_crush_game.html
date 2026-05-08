@@ -1,0 +1,2327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Candy Crush Saga - 2000 Levels</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; -webkit-tap-highlight-color: transparent; }
+        body { 
+            font-family: 'Nunito', sans-serif; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            min-height: 100vh; 
+            overflow-x: hidden; 
+            user-select: none; 
+        }
+        .font-display { font-family: 'Fredoka One', cursive; }
+
+        .game-container { 
+            position: relative; 
+            width: 100%; 
+            max-width: 500px; 
+            margin: 0 auto; 
+        }
+
+        .game-board { 
+            display: grid; 
+            gap: 2px; 
+            padding: 8px; 
+            background: rgba(255,255,255,0.15); 
+            backdrop-filter: blur(10px); 
+            border-radius: 16px; 
+            border: 2px solid rgba(255,255,255,0.3); 
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3); 
+            width: 100%;
+            aspect-ratio: 1;
+            position: relative; 
+            overflow: hidden; 
+        }
+
+        .cell { 
+            position: relative; 
+            border-radius: 10px; 
+            cursor: pointer; 
+            transition: transform 0.15s, filter 0.15s; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            font-size: 2rem; 
+            background: rgba(255,255,255,0.2); 
+            box-shadow: inset 0 1px 3px rgba(255,255,255,0.3), 0 2px 4px rgba(0,0,0,0.1); 
+            min-height: 0;
+            min-width: 0;
+        }
+
+        .cell:active { transform: scale(0.92); }
+
+        .cell.selected { 
+            background: rgba(255,255,255,0.5); 
+            box-shadow: 0 0 20px rgba(255,255,255,0.8), inset 0 0 15px rgba(255,255,255,0.4); 
+            transform: scale(1.08); 
+            z-index: 10; 
+            animation: pulse-select 1s infinite; 
+        }
+
+        .cell.matched { animation: match-pop 0.4s ease-out forwards; }
+        .cell.falling { animation: fall-in 0.5s ease-out; }
+
+        .cell.special-striped-h::after { 
+            content: ''; position: absolute; inset: 0; border-radius: 10px; 
+            background: repeating-linear-gradient(90deg, transparent, transparent 4px, rgba(255,255,255,0.7) 4px, rgba(255,255,255,0.7) 8px); 
+        }
+
+        .cell.special-striped-v::after { 
+            content: ''; position: absolute; inset: 0; border-radius: 10px; 
+            background: repeating-linear-gradient(0deg, transparent, transparent 4px, rgba(255,255,255,0.7) 4px, rgba(255,255,255,0.7) 8px); 
+        }
+
+        .cell.special-wrapped { background: rgba(255,215,0,0.4); border: 3px solid #FFD700; }
+        .cell.special-bomb { background: radial-gradient(circle, #ff006e, #8338ec); animation: bomb-pulse 1s infinite; }
+        .cell.special-colorbomb { background: conic-gradient(from 0deg, #ff006e, #fb5607, #ffbe0b, #8338ec, #3a86ff, #06ffa5, #ff006e); animation: rotate 3s linear infinite; }
+
+        /* Obstacles */
+        .cell.obstacle-rock { background: linear-gradient(135deg, #4a4a4a, #2d2d2d); border: 2px solid #666; }
+        .cell.obstacle-rock::after { content: '🪨'; font-size: 1.5rem; }
+
+        .cell.obstacle-ice { background: linear-gradient(135deg, #74b9ff, #0984e3); border: 2px solid rgba(255,255,255,0.6); animation: ice-shine 2s infinite; }
+        .cell.obstacle-ice::after { content: '🧊'; font-size: 1.5rem; }
+
+        .cell.obstacle-chocolate { background: linear-gradient(135deg, #5d4037, #3e2723); border: 2px solid #8d6e63; }
+        .cell.obstacle-chocolate::after { content: '🍫'; font-size: 1.5rem; }
+
+        .cell.obstacle-cage { background: rgba(0,0,0,0.2); border: 3px dashed #fdcb6e; }
+        .cell.obstacle-cage::after { content: '🔒'; font-size: 1.3rem; position: absolute; }
+
+        .cell.obstacle-marmalade { background: linear-gradient(135deg, #fdcb6e, #e17055); border: 2px solid #ffeaa7; opacity: 0.9; }
+        .cell.obstacle-marmalade::after { content: '🍯'; font-size: 1.5rem; }
+
+        .cell.obstacle-cake { background: linear-gradient(135deg, #fd79a8, #e84393); border: 3px solid #fab1a0; }
+        .cell.obstacle-cake::after { content: '🎂'; font-size: 1.5rem; }
+
+        .cell.obstacle-bomb { background: radial-gradient(circle, #ff0000, #8b0000); animation: bomb-tick 0.5s infinite; }
+        .cell.obstacle-bomb::after { content: '💣'; font-size: 1.5rem; }
+
+        .cell.obstacle-licorice { background: linear-gradient(135deg, #2d3436, #000000); border: 2px solid #636e72; }
+        .cell.obstacle-licorice::after { content: '📿'; font-size: 1.5rem; }
+
+        /* Jelly */
+        .cell.jelly-single { background: rgba(255,107,157,0.3); border: 2px solid #ff6b9d; }
+        .cell.jelly-double { background: rgba(255,107,157,0.6); border: 3px solid #ff006e; box-shadow: inset 0 0 10px rgba(255,0,110,0.3); }
+        .cell.jelly-single::before, .cell.jelly-double::before { 
+            content: ''; position: absolute; inset: 0; 
+            background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.3), transparent); 
+            border-radius: 10px; animation: jelly-glow 2s ease-in-out infinite; 
+        }
+
+        /* Ingredients */
+        .cell.ingredient-cherry::after { content: '🍒'; font-size: 1.6rem; position: absolute; z-index: 5; }
+        .cell.ingredient-hazelnut::after { content: '🌰'; font-size: 1.6rem; position: absolute; z-index: 5; }
+
+        /* Teleporter */
+        .cell.teleporter-in { background: radial-gradient(circle, #00cec9, #0984e3); border: 2px solid #81ecec; animation: portal-spin 2s linear infinite; }
+        .cell.teleporter-in::after { content: '🔵'; font-size: 1.3rem; }
+        .cell.teleporter-out { background: radial-gradient(circle, #fd79a8, #e84393); border: 2px solid #fab1a0; animation: portal-spin 2s linear infinite reverse; }
+        .cell.teleporter-out::after { content: '🔴'; font-size: 1.3rem; }
+
+        @keyframes pulse-select { 0%,100% { box-shadow: 0 0 15px rgba(255,255,255,0.6); } 50% { box-shadow: 0 0 25px rgba(255,255,255,0.9); } }
+        @keyframes match-pop { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.3); opacity: 0.8; } 100% { transform: scale(0); opacity: 0; } }
+        @keyframes fall-in { 0% { transform: translateY(-100px); opacity: 0; } 100% { transform: translateY(0); opacity: 1; } }
+        @keyframes bomb-pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+        @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes score-popup { 0% { transform: translateY(0) scale(1); opacity: 1; } 100% { transform: translateY(-80px) scale(1.5); opacity: 0; } }
+        @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+        @keyframes ice-shine { 0%,100% { opacity: 1; } 50% { opacity: 0.7; } }
+        @keyframes jelly-glow { 0%,100% { opacity: 0.5; } 50% { opacity: 1; } }
+        @keyframes bomb-tick { 0%,100% { transform: scale(1); } 50% { transform: scale(1.15); } }
+        @keyframes portal-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes combo-anim { 0% { transform: scale(0) rotate(-10deg); opacity: 0; } 20% { transform: scale(1.2) rotate(5deg); opacity: 1; } 100% { transform: scale(1) rotate(0deg) translateY(-100px); opacity: 0; } }
+        @keyframes floating { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+        @keyframes shine { 0% { transform: translateX(-100%) rotate(45deg); } 100% { transform: translateX(100%) rotate(45deg); } }
+
+        .score-popup { position: absolute; font-family: 'Fredoka One', cursive; font-size: 1.5rem; color: #FFD700; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); pointer-events: none; animation: score-popup 1s ease-out forwards; z-index: 100; }
+        .shake { animation: shake 0.3s ease-in-out; }
+        .particle { position: absolute; width: 8px; height: 8px; border-radius: 50%; pointer-events: none; z-index: 50; }
+        .combo-text { position: absolute; font-family: 'Fredoka One', cursive; font-size: 2rem; color: #ff006e; text-shadow: 3px 3px 6px rgba(0,0,0,0.5); pointer-events: none; z-index: 200; animation: combo-anim 1.5s ease-out forwards; }
+
+        .glass-panel { background: rgba(255,255,255,0.15); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.25); border-radius: 20px; box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
+
+        .btn-primary { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            color: white; font-weight: 800; padding: 12px 32px; border-radius: 50px; 
+            border: none; cursor: pointer; font-size: 1.1rem; 
+            box-shadow: 0 4px 15px rgba(102,126,234,0.4); transition: all 0.3s; 
+            text-transform: uppercase; letter-spacing: 1px; font-family: 'Nunito', sans-serif; 
+        }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(102,126,234,0.6); }
+        .btn-primary:active { transform: translateY(0); }
+
+        .btn-secondary { 
+            background: rgba(255,255,255,0.2); color: white; font-weight: 700; 
+            padding: 8px 16px; border-radius: 50px; border: 2px solid rgba(255,255,255,0.3); 
+            cursor: pointer; transition: all 0.3s; font-size: 0.85rem;
+        }
+        .btn-secondary:hover { background: rgba(255,255,255,0.3); }
+
+        .btn-boost { 
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); 
+            color: white; font-weight: 700; padding: 6px 12px; border-radius: 14px; 
+            border: none; cursor: pointer; font-size: 0.8rem; transition: all 0.3s; 
+            display: flex; align-items: center; gap: 4px; position: relative; overflow: hidden;
+            white-space: nowrap;
+        }
+        .btn-boost:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(245,87,108,0.4); }
+        .btn-boost:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .btn-boost .count { background: rgba(0,0,0,0.3); padding: 1px 6px; border-radius: 8px; font-size: 0.7rem; }
+
+        .progress-container { height: 10px; background: rgba(0,0,0,0.2); border-radius: 10px; overflow: hidden; position: relative; }
+        .progress-bar { height: 100%; background: linear-gradient(90deg, #f093fb 0%, #f5576c 100%); border-radius: 10px; transition: width 0.5s ease; box-shadow: 0 0 10px rgba(245,87,108,0.5); }
+
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 1000; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+        .modal-overlay.active { opacity: 1; pointer-events: all; }
+        .modal-content { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border: 2px solid rgba(255,255,255,0.1); border-radius: 24px; padding: 32px; max-width: 90%; width: 420px; max-height: 90vh; overflow-y: auto; transform: scale(0.9); transition: transform 0.3s; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+        .modal-overlay.active .modal-content { transform: scale(1); }
+
+        .tab-btn { padding: 8px 16px; border-radius: 20px; border: none; background: transparent; color: rgba(255,255,255,0.6); font-weight: 700; cursor: pointer; transition: all 0.3s; font-size: 0.9rem; }
+        .tab-btn.active { background: rgba(102,126,234,0.3); color: white; }
+
+        .leaderboard-item { display: flex; align-items: center; padding: 12px; border-radius: 12px; margin-bottom: 8px; background: rgba(255,255,255,0.05); transition: all 0.2s; }
+        .leaderboard-item:hover { background: rgba(255,255,255,0.1); transform: translateX(4px); }
+        .rank-1 { background: linear-gradient(135deg, rgba(255,215,0,0.2), rgba(255,215,0,0.05)) !important; border: 1px solid rgba(255,215,0,0.3); }
+        .rank-2 { background: linear-gradient(135deg, rgba(192,192,192,0.2), rgba(192,192,192,0.05)) !important; border: 1px solid rgba(192,192,192,0.3); }
+        .rank-3 { background: linear-gradient(135deg, rgba(205,127,50,0.2), rgba(205,127,50,0.05)) !important; border: 1px solid rgba(205,127,50,0.3); }
+
+        .floating { animation: floating 3s ease-in-out infinite; }
+
+        .level-map { display: flex; flex-direction: column; align-items: center; gap: 20px; padding: 20px; }
+        .level-node { width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: 'Fredoka One', cursive; font-size: 1.2rem; cursor: pointer; transition: all 0.3s; position: relative; }
+        .level-node.locked { background: linear-gradient(135deg, #636e72, #b2bec3); color: rgba(255,255,255,0.5); border: 3px solid rgba(255,255,255,0.2); }
+        .level-node.unlocked { background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: 3px solid rgba(255,255,255,0.4); box-shadow: 0 4px 15px rgba(102,126,234,0.4); animation: pulse-node 2s infinite; }
+        .level-node.completed { background: linear-gradient(135deg, #00b894, #00cec9); color: white; border: 3px solid rgba(255,255,255,0.4); }
+        .level-node .stars { position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%); font-size: 0.7rem; white-space: nowrap; }
+        @keyframes pulse-node { 0%,100% { box-shadow: 0 4px 15px rgba(102,126,234,0.4); } 50% { box-shadow: 0 4px 25px rgba(102,126,234,0.7); } }
+        .path-line { width: 4px; height: 30px; background: linear-gradient(to bottom, rgba(102,126,234,0.5), rgba(118,75,162,0.5)); border-radius: 2px; }
+
+        .daily-reward { background: linear-gradient(135deg, #fdcb6e, #e17055); border-radius: 20px; padding: 20px; text-align: center; position: relative; overflow: hidden; }
+        .daily-reward::before { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent); animation: shine 3s infinite; }
+
+        .coin-display { display: flex; align-items: center; gap: 4px; background: linear-gradient(135deg, #fdcb6e, #f39c12); padding: 4px 10px; border-radius: 16px; font-weight: 800; color: #2d3436; box-shadow: 0 2px 8px rgba(253,203,110,0.4); font-size: 0.85rem; }
+        .lives-display { display: flex; align-items: center; gap: 4px; background: linear-gradient(135deg, #ff6b9d, #ee5a6f); padding: 4px 10px; border-radius: 16px; font-weight: 800; box-shadow: 0 2px 8px rgba(255,107,157,0.4); font-size: 0.85rem; }
+        .timer-text { font-size: 0.7rem; opacity: 0.9; }
+
+        .achievement-badge { width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; background: linear-gradient(135deg, #fdcb6e, #f39c12); border: 3px solid rgba(255,255,255,0.3); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+        .achievement-badge.locked { background: linear-gradient(135deg, #636e72, #b2bec3); filter: grayscale(0.8); }
+
+        .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-100px); background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 12px 24px; border-radius: 50px; font-weight: 700; z-index: 2000; box-shadow: 0 4px 20px rgba(0,0,0,0.3); transition: transform 0.3s ease; border: 2px solid rgba(255,255,255,0.2); }
+        .toast.show { transform: translateX(-50%) translateY(0); }
+
+        .shop-item { background: rgba(255,255,255,0.1); border-radius: 16px; padding: 16px; text-align: center; transition: all 0.3s; border: 2px solid rgba(255,255,255,0.1); }
+        .shop-item:hover { transform: translateY(-4px); background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.3); }
+
+        .world-section { background: linear-gradient(135deg, rgba(102,126,234,0.2), rgba(118,75,162,0.2)); border-radius: 16px; padding: 16px; margin-bottom: 16px; border: 1px solid rgba(255,255,255,0.1); }
+        .world-title { font-family: 'Fredoka One', cursive; font-size: 1.2rem; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+        .world-levels { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+        .world-level-btn { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; border: 2px solid transparent; position: relative; }
+        .world-level-btn:hover { transform: scale(1.1); }
+        .world-level-btn.completed { background: linear-gradient(135deg, #00b894, #00cec9); color: white; }
+        .world-level-btn.unlocked { background: linear-gradient(135deg, #667eea, #764ba2); color: white; border-color: rgba(255,255,255,0.3); }
+        .world-level-btn.locked { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.4); cursor: not-allowed; }
+
+        .level-info-bar { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 8px; }
+        .level-info-pill { background: rgba(255,255,255,0.15); padding: 4px 12px; border-radius: 16px; font-size: 0.8rem; font-weight: 700; display: flex; align-items: center; gap: 4px; }
+
+        .objective-panel { background: rgba(0,0,0,0.2); border-radius: 12px; padding: 8px 12px; margin-bottom: 8px; }
+        .objective-item { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; padding: 2px 0; }
+        .objective-item.completed { text-decoration: line-through; opacity: 0.5; }
+
+        @media (max-width: 640px) {
+            .game-board { gap: 1px; padding: 4px; border-radius: 12px; }
+            .cell { font-size: 1.5rem; border-radius: 8px; }
+            .cell.selected { transform: scale(1.1); }
+            .world-level-btn { width: 38px; height: 38px; font-size: 0.75rem; }
+            .btn-boost { padding: 4px 8px; font-size: 0.75rem; }
+        }
+
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: rgba(255,255,255,0.1); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.3); border-radius: 4px; }
+
+        .spinner { width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .g_id_signin { display: flex; justify-content: center; margin: 16px 0; }
+    </style>
+</head>
+<body class="text-white">
+    <div id="bg-particles" class="fixed inset-0 pointer-events-none overflow-hidden"></div>
+
+    <div id="app" class="relative z-10 min-h-screen flex flex-col">
+
+        <!-- Header -->
+        <header class="p-3 flex justify-between items-center max-w-2xl mx-auto w-full">
+            <div class="flex items-center gap-2">
+                <div class="text-2xl floating">🍬</div>
+                <div>
+                    <h1 class="font-display text-xl tracking-wide bg-clip-text text-transparent bg-gradient-to-r from-pink-400 to-purple-400">Candy Crush</h1>
+                    <p class="text-xs text-white/60 font-semibold">2000 LEVELS</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap justify-end">
+                <div class="coin-display">
+                    <span>💰</span>
+                    <span id="coins-display">100</span>
+                </div>
+                <div class="lives-display">
+                    <span>❤️</span>
+                    <span id="lives-display">5</span>
+                    <span id="lives-timer" class="timer-text hidden">30:00</span>
+                </div>
+                <button onclick="game.toggleSound()" class="p-1.5 rounded-full bg-white/10 hover:bg-white/20 transition text-sm" id="sound-btn">🔊</button>
+                <div id="user-section" class="hidden flex items-center gap-1">
+                    <img id="user-avatar" src="" class="w-7 h-7 rounded-full border-2 border-white/30" alt="">
+                </div>
+                <button id="login-btn" onclick="game.showLogin()" class="btn-secondary text-xs py-1.5 px-3">Sign In</button>
+            </div>
+        </header>
+
+        <!-- Level Info -->
+        <div class="max-w-2xl mx-auto w-full px-4 mb-2">
+            <div class="level-info-bar">
+                <div class="level-info-pill">
+                    <span>📍</span>
+                    <span id="world-name">Candy Town</span>
+                </div>
+                <div class="level-info-pill">
+                    <span>🎯</span>
+                    <span id="level-type-name">Score</span>
+                </div>
+                <div class="level-info-pill">
+                    <span>⭐</span>
+                    <span id="level-stars-display">0/3</span>
+                </div>
+            </div>
+
+            <!-- Objectives -->
+            <div id="objectives-panel" class="objective-panel hidden">
+                <div id="objectives-list"></div>
+            </div>
+        </div>
+
+        <!-- Boost Bar -->
+        <div class="max-w-2xl mx-auto w-full px-4 mb-2">
+            <div class="glass-panel p-2 flex justify-center gap-2 flex-wrap">
+                <button onclick="game.useBoost('hammer')" id="boost-hammer" class="btn-boost">
+                    🔨 <span class="count" id="hammer-count">3</span>
+                </button>
+                <button onclick="game.useBoost('shuffle')" id="boost-shuffle" class="btn-boost">
+                    🔀 <span class="count" id="shuffle-count">2</span>
+                </button>
+                <button onclick="game.useBoost('bomb')" id="boost-bomb" class="btn-boost">
+                    💣 <span class="count" id="bomb-count">1</span>
+                </button>
+                <button onclick="game.useBoost('extraMoves')" id="boost-moves" class="btn-boost">
+                    ➕5 <span class="count" id="moves-count">2</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Game Stats -->
+        <div class="max-w-2xl mx-auto w-full px-4 mb-3">
+            <div class="glass-panel p-3 flex justify-between items-center">
+                <div class="text-center">
+                    <p class="text-xs text-white/60 uppercase font-bold tracking-wider">Score</p>
+                    <p id="score-display" class="font-display text-xl text-yellow-300">0</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-xs text-white/60 uppercase font-bold tracking-wider">Level</p>
+                    <p id="level-display" class="font-display text-xl text-pink-300">1</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-xs text-white/60 uppercase font-bold tracking-wider">Moves</p>
+                    <p id="moves-display" class="font-display text-xl text-cyan-300">30</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-xs text-white/60 uppercase font-bold tracking-wider">Target</p>
+                    <p id="target-display" class="font-display text-lg text-green-300">1000</p>
+                </div>
+            </div>
+
+            <div class="mt-2 glass-panel p-2">
+                <div class="flex justify-between text-xs mb-1">
+                    <span class="text-white/70">Progress</span>
+                    <span id="progress-text" class="text-white/70">0%</span>
+                </div>
+                <div class="progress-container">
+                    <div id="progress-bar" class="progress-bar" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Board -->
+        <div class="flex-1 flex items-center justify-center px-4 pb-3">
+            <div class="game-container">
+                <div id="game-board" class="game-board"></div>
+                <div id="combo-indicator" class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none hidden">
+                    <div class="combo-text">COMBO x2!</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Actions -->
+        <div class="max-w-2xl mx-auto w-full px-4 pb-4 flex justify-center gap-2 flex-wrap">
+            <button onclick="game.showWorldMap()" class="btn-secondary text-xs flex items-center gap-1">🗺️ Map</button>
+            <button onclick="game.showLeaderboard()" class="btn-secondary text-xs flex items-center gap-1">🏆 Rank</button>
+            <button onclick="game.showShop()" class="btn-secondary text-xs flex items-center gap-1">🛒 Shop</button>
+            <button onclick="game.showDailyReward()" class="btn-secondary text-xs flex items-center gap-1">🎁 Daily</button>
+            <button onclick="game.showAchievements()" class="btn-secondary text-xs flex items-center gap-1">🏅 Badges</button>
+            <button onclick="game.restartLevel()" class="btn-secondary text-xs flex items-center gap-1">🔄 Retry</button>
+            <button onclick="game.showSettings()" class="btn-secondary text-xs flex items-center gap-1">⚙️</button>
+        </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div id="login-modal" class="modal-overlay">
+        <div class="modal-content text-center">
+            <div class="text-5xl mb-4 floating">🍭</div>
+            <h2 class="font-display text-2xl mb-2">Candy Crush Saga</h2>
+            <p class="text-white/60 mb-6">Sign in to save 2000 levels of progress!</p>
+            <div id="g_id_onload" data-client_id="YOUR_GOOGLE_CLIENT_ID" data-callback="game.handleGoogleLogin" data-auto_prompt="false"></div>
+            <div class="g_id_signin" data-type="standard" data-size="large" data-theme="outline" data-text="sign_in_with" data-shape="rectangular" data-logo_alignment="left"></div>
+            <p class="text-xs text-white/40 mt-4">Or continue as guest</p>
+            <button onclick="game.closeModal('login-modal')" class="btn-secondary mt-2 w-full">Play as Guest</button>
+        </div>
+    </div>
+
+    <!-- World Map Modal -->
+    <div id="worldmap-modal" class="modal-overlay">
+        <div class="modal-content" style="width: 90%; max-width: 600px;">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="font-display text-2xl">🗺️ World Map</h2>
+                <button onclick="game.closeModal('worldmap-modal')" class="text-white/60 hover:text-white text-2xl">&times;</button>
+            </div>
+            <div class="mb-4 flex gap-2 overflow-x-auto pb-2" id="world-tabs"></div>
+            <div id="world-map-container" style="max-height: 60vh; overflow-y: auto;"></div>
+        </div>
+    </div>
+
+    <!-- Leaderboard Modal -->
+    <div id="leaderboard-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="font-display text-2xl">🏆 Leaderboard</h2>
+                <button onclick="game.closeModal('leaderboard-modal')" class="text-white/60 hover:text-white text-2xl">&times;</button>
+            </div>
+            <div class="flex justify-center gap-2 mb-6">
+                <button class="tab-btn active" onclick="game.switchLeaderboardTab('alltime')">All Time</button>
+                <button class="tab-btn" onclick="game.switchLeaderboardTab('weekly')">Weekly</button>
+                <button class="tab-btn" onclick="game.switchLeaderboardTab('top10')">Top 10</button>
+            </div>
+            <div id="leaderboard-list" class="space-y-2 max-h-96 overflow-y-auto"></div>
+        </div>
+    </div>
+
+    <!-- Shop Modal -->
+    <div id="shop-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="font-display text-2xl">🛒 Power-up Shop</h2>
+                <button onclick="game.closeModal('shop-modal')" class="text-white/60 hover:text-white text-2xl">&times;</button>
+            </div>
+            <div class="grid grid-cols-2 gap-4" id="shop-items"></div>
+        </div>
+    </div>
+
+    <!-- Daily Reward Modal -->
+    <div id="daily-modal" class="modal-overlay">
+        <div class="modal-content text-center">
+            <div class="text-5xl mb-4 floating">🎁</div>
+            <h2 class="font-display text-2xl mb-2">Daily Reward</h2>
+            <p class="text-white/60 mb-4">Day <span id="daily-streak">1</span> Streak 🔥</p>
+            <div class="daily-reward mb-6">
+                <p class="text-3xl font-display mb-2" id="daily-reward-amount">+50 Coins</p>
+            </div>
+            <div class="grid grid-cols-7 gap-2 mb-6" id="daily-calendar"></div>
+            <button onclick="game.claimDailyReward()" class="btn-primary w-full" id="claim-btn">Claim Reward</button>
+            <p id="daily-timer" class="text-xs text-white/40 mt-3"></p>
+        </div>
+    </div>
+
+    <!-- Achievements Modal -->
+    <div id="achievements-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="font-display text-2xl">🏅 Achievements</h2>
+                <button onclick="game.closeModal('achievements-modal')" class="text-white/60 hover:text-white text-2xl">&times;</button>
+            </div>
+            <div id="achievements-list" class="space-y-3 max-h-96 overflow-y-auto"></div>
+        </div>
+    </div>
+
+    <!-- Level Complete Modal -->
+    <div id="level-modal" class="modal-overlay">
+        <div class="modal-content text-center">
+            <div class="text-6xl mb-4 floating">🎉</div>
+            <h2 class="font-display text-3xl mb-2 text-yellow-300">Level Complete!</h2>
+            <p class="text-white/60 mb-2" id="level-complete-msg">Amazing!</p>
+            <div class="glass-panel p-4 mb-6">
+                <div class="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                        <p class="text-xs text-white/60">Score</p>
+                        <p id="level-score" class="font-display text-xl text-yellow-300">0</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-white/60">Stars</p>
+                        <p id="level-stars" class="font-display text-xl text-yellow-300">⭐⭐⭐</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-white/60">Bonus</p>
+                        <p id="level-bonus" class="font-display text-xl text-green-300">+500</p>
+                    </div>
+                </div>
+            </div>
+            <div class="flex gap-3 justify-center">
+                <button onclick="game.nextLevel()" class="btn-primary">Next Level</button>
+                <button onclick="game.closeModal('level-modal'); game.showWorldMap()" class="btn-secondary">Map</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Over Modal -->
+    <div id="gameover-modal" class="modal-overlay">
+        <div class="modal-content text-center">
+            <div class="text-6xl mb-4">😢</div>
+            <h2 class="font-display text-3xl mb-2 text-red-400">Out of Moves!</h2>
+            <p class="text-white/60 mb-4" id="gameover-reason">You needed more moves!</p>
+            <div class="glass-panel p-4 mb-6">
+                <p class="text-sm text-white/60">Final Score</p>
+                <p id="final-score" class="font-display text-3xl text-yellow-300">0</p>
+            </div>
+            <div class="flex gap-3 justify-center mb-4">
+                <button onclick="game.buyExtraMoves()" class="btn-primary text-sm">💰 5 Moves (50 Coins)</button>
+            </div>
+            <div class="flex gap-3 justify-center">
+                <button onclick="game.restartLevel()" class="btn-secondary">Try Again</button>
+                <button onclick="game.closeModal('gameover-modal'); game.showWorldMap()" class="btn-secondary">Map</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="font-display text-2xl">⚙️ Settings</h2>
+                <button onclick="game.closeModal('settings-modal')" class="text-white/60 hover:text-white text-2xl">&times;</button>
+            </div>
+            <div class="space-y-4">
+                <div class="flex justify-between items-center p-3 glass-panel">
+                    <span>Sound Effects</span>
+                    <button onclick="game.toggleSound()" id="settings-sound" class="w-12 h-6 rounded-full bg-green-500 relative transition-colors">
+                        <div class="w-5 h-5 bg-white rounded-full absolute top-0.5 right-0.5 transition-transform"></div>
+                    </button>
+                </div>
+                <div class="flex justify-between items-center p-3 glass-panel">
+                    <span>Music</span>
+                    <button onclick="game.toggleMusic()" id="settings-music" class="w-12 h-6 rounded-full bg-green-500 relative transition-colors">
+                        <div class="w-5 h-5 bg-white rounded-full absolute top-0.5 right-0.5 transition-transform"></div>
+                    </button>
+                </div>
+                <div class="flex justify-between items-center p-3 glass-panel">
+                    <span>Vibration</span>
+                    <button onclick="game.toggleVibration()" id="settings-vibration" class="w-12 h-6 rounded-full bg-green-500 relative transition-colors">
+                        <div class="w-5 h-5 bg-white rounded-full absolute top-0.5 right-0.5 transition-transform"></div>
+                    </button>
+                </div>
+                <button onclick="game.resetProgress()" class="w-full py-3 rounded-xl bg-red-500/20 border border-red-500/30 text-red-300 hover:bg-red-500/30 transition font-bold">Reset All Progress</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+
+        // ==================== AUDIO ENGINE ====================
+        class AudioEngine {
+            constructor() {
+                this.ctx = null;
+                this.enabled = true;
+                this.musicEnabled = true;
+                this.initialized = false;
+            }
+
+            init() {
+                if (this.initialized) return;
+                this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                this.initialized = true;
+            }
+
+            playTone(freq, duration, type = 'sine', volume = 0.3) {
+                if (!this.enabled || !this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                gain.gain.setValueAtTime(volume, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + duration);
+            }
+
+            playMatch() {
+                this.playTone(523, 0.1, 'sine', 0.2);
+                setTimeout(() => this.playTone(659, 0.1, 'sine', 0.2), 50);
+                setTimeout(() => this.playTone(784, 0.15, 'sine', 0.2), 100);
+            }
+
+            playSpecial() {
+                [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => this.playTone(f, 0.2, 'square', 0.15), i * 80));
+            }
+
+            playSwap() { this.playTone(400, 0.1, 'sine', 0.1); }
+            playInvalid() { this.playTone(200, 0.2, 'sawtooth', 0.1); }
+
+            playWin() {
+                const notes = [523, 587, 659, 698, 784, 880, 988, 1047];
+                notes.forEach((f, i) => setTimeout(() => this.playTone(f, 0.3, 'sine', 0.2), i * 100));
+            }
+
+            playGameOver() {
+                [400, 350, 300, 250].forEach((f, i) => setTimeout(() => this.playTone(f, 0.4, 'sawtooth', 0.15), i * 200));
+            }
+
+            playBoost() {
+                this.playTone(880, 0.3, 'sine', 0.3);
+                setTimeout(() => this.playTone(1100, 0.3, 'sine', 0.3), 100);
+            }
+
+            playCoin() {
+                this.playTone(1200, 0.1, 'sine', 0.2);
+                setTimeout(() => this.playTone(1600, 0.15, 'sine', 0.2), 50);
+            }
+
+            playBreak() {
+                this.playTone(600, 0.15, 'sawtooth', 0.2);
+                setTimeout(() => this.playTone(800, 0.1, 'sine', 0.15), 100);
+            }
+        }
+
+        // ==================== 2000 LEVEL SYSTEM ====================
+        class LevelSystem {
+            constructor() {
+                this.worlds = this.generateWorlds();
+                this.levels = this.generate2000Levels();
+            }
+
+            generateWorlds() {
+                return [
+                    { id: 0, name: "Candy Town", emoji: "🏘️", levels: "1-20", theme: "easy" },
+                    { id: 1, name: "Lemonade Lake", emoji: "🍋", levels: "21-35", theme: "easy" },
+                    { id: 2, name: "Chocolate Hills", emoji: "🍫", levels: "36-50", theme: "easy" },
+                    { id: 3, name: "Minty Meadows", emoji: "🌿", levels: "51-65", theme: "easy-medium" },
+                    { id: 4, name: "Bubblegum Bridge", emoji: "🫧", levels: "66-80", theme: "easy-medium" },
+                    { id: 5, name: "Peppermint Palace", emoji: "🏰", levels: "81-95", theme: "medium" },
+                    { id: 6, name: "Ice Cream Alps", emoji: "🏔️", levels: "96-110", theme: "medium" },
+                    { id: 7, name: "Caramel Cove", emoji: "🌊", levels: "111-125", theme: "medium" },
+                    { id: 8, name: "Soda Springs", emoji: "🥤", levels: "126-140", theme: "medium-hard" },
+                    { id: 9, name: "Jelly Jungle", emoji: "🌴", levels: "141-155", theme: "medium-hard" },
+                    { id: 10, name: "Rocky Road", emoji: "🪨", levels: "156-170", theme: "medium-hard" },
+                    { id: 11, name: "Licorice Tower", emoji: "🗼", levels: "171-185", theme: "hard" },
+                    { id: 12, name: "Donut Desert", emoji: "🏜️", levels: "186-200", theme: "hard" },
+                    { id: 13, name: "Cupcake Canyon", emoji: "🧁", levels: "201-220", theme: "hard" },
+                    { id: 14, name: "Marshmallow Mountains", emoji: "⛰️", levels: "221-240", theme: "hard" },
+                    { id: 15, name: "Gummy Gorge", emoji: "🌉", levels: "241-260", theme: "very-hard" },
+                    { id: 16, name: "Fudge Factory", emoji: "🏭", levels: "261-280", theme: "very-hard" },
+                    { id: 17, name: "Candy Clouds", emoji: "☁️", levels: "281-300", theme: "very-hard" },
+                    { id: 18, name: "Sugar Swamp", emoji: "🐊", levels: "301-320", theme: "expert" },
+                    { id: 19, name: "Caramel Castle", emoji: "🏰", levels: "321-340", theme: "expert" },
+                    { id: 20, name: "Pudding Paradise", emoji: "🌺", levels: "341-360", theme: "expert" },
+                    { id: 21, name: "Taffy Tundra", emoji: "❄️", levels: "361-380", theme: "expert" },
+                    { id: 22, name: "Bonbon Bayou", emoji: "🦐", levels: "381-400", theme: "master" },
+                    { id: 23, name: "Nougat Nexus", emoji: "🌐", levels: "401-420", theme: "master" },
+                    { id: 24, name: "Truffle Temple", emoji: "⛩️", levels: "421-440", theme: "master" },
+                    { id: 25, name: "Fondant Fortress", emoji: "🏯", levels: "441-460", theme: "master" },
+                    { id: 26, name: "Ganache Galaxy", emoji: "🌌", levels: "461-480", theme: "legend" },
+                    { id: 27, name: "Praline Palace", emoji: "👑", levels: "481-500", theme: "legend" },
+                    { id: 28, name: "Sorbet Sanctuary", emoji: "🕊️", levels: "501-530", theme: "legend" },
+                    { id: 29, name: "Toffee Throne", emoji: "🦁", levels: "531-560", theme: "legend" },
+                    { id: 30, name: "Candy Cosmos", emoji: "🚀", levels: "561-590", theme: "mythic" },
+                    { id: 31, name: "Sugar Supernova", emoji: "💥", levels: "591-620", theme: "mythic" },
+                    { id: 32, name: "Nebula Nectar", emoji: "🌠", levels: "621-650", theme: "mythic" },
+                    { id: 33, name: "Galaxy Glaze", emoji: "🪐", levels: "651-680", theme: "mythic" },
+                    { id: 34, name: "Quantum Quince", emoji: "⚛️", levels: "681-710", theme: "ultimate" },
+                    { id: 35, name: "Infinity Icing", emoji: "∞", levels: "711-740", theme: "ultimate" },
+                    { id: 36, name: "Eternity Eclair", emoji: "⏳", levels: "741-770", theme: "ultimate" },
+                    { id: 37, name: "Divine Donut", emoji: "😇", levels: "771-800", theme: "ultimate" },
+                    { id: 38, name: "Cosmic Cake", emoji: "🎂", levels: "801-850", theme: "god" },
+                    { id: 39, name: "Universal Upside", emoji: "🌎", levels: "851-900", theme: "god" },
+                    { id: 40, name: "Multiverse Mousse", emoji: "🌀", levels: "901-950", theme: "god" },
+                    { id: 41, name: "Omniverse Opera", emoji: "🎭", levels: "951-1000", theme: "god" },
+                    { id: 42, name: "Transcendent Tart", emoji: "🔮", levels: "1001-1050", theme: "transcendent" },
+                    { id: 43, name: "Ethereal Éclair", emoji: "👻", levels: "1051-1100", theme: "transcendent" },
+                    { id: 44, name: "Celestial Candy", emoji: "✨", levels: "1101-1150", theme: "transcendent" },
+                    { id: 45, name: "Astral Ambrosia", emoji: "🌟", levels: "1151-1200", theme: "transcendent" },
+                    { id: 46, name: "Seraphic Sweets", emoji: "👼", levels: "1201-1250", theme: "divine" },
+                    { id: 47, name: "Paradise Pastry", emoji: "🌈", levels: "1251-1300", theme: "divine" },
+                    { id: 48, name: "Nirvana Nougat", emoji: "🧘", levels: "1301-1350", theme: "divine" },
+                    { id: 49, name: "Enlightenment", emoji: "☸️", levels: "1351-1400", theme: "divine" },
+                    { id: 50, name: "Omnipotent Oreo", emoji: "⚡", levels: "1401-1450", theme: "omnipotent" },
+                    { id: 51, name: "Supreme Sorbet", emoji: "👁️", levels: "1451-1500", theme: "omnipotent" },
+                    { id: 52, name: "Absolute Almond", emoji: "💎", levels: "1501-1550", theme: "omnipotent" },
+                    { id: 53, name: "Perfect Pecan", emoji: "🎯", levels: "1551-1600", theme: "perfect" },
+                    { id: 54, name: "Flawless Fudge", emoji: "💯", levels: "1601-1650", theme: "perfect" },
+                    { id: 55, name: "Immaculate Ice", emoji: "🧊", levels: "1651-1700", theme: "perfect" },
+                    { id: 56, name: "Pristine Pie", emoji: "🥧", levels: "1701-1750", theme: "pristine" },
+                    { id: 57, name: "Pure Parfait", emoji: "🍨", levels: "1751-1800", theme: "pristine" },
+                    { id: 58, name: "Sacred Sundae", emoji: "🍦", levels: "1801-1850", theme: "sacred" },
+                    { id: 59, name: "Holy Halva", emoji: "🕊️", levels: "1851-1900", theme: "sacred" },
+                    { id: 60, name: "Godly Gelato", emoji: "👑", levels: "1901-1950", theme: "godly" },
+                    { id: 61, name: "Eternal Empire", emoji: "🏛️", levels: "1951-2000", theme: "eternal" },
+                ];
+            }
+
+            generate2000Levels() {
+                const levels = [];
+                const types = ['score', 'jelly', 'ingredients', 'timed', 'order', 'mixed'];
+                const typeNames = { score: 'Score', jelly: 'Jelly', ingredients: 'Drop', timed: 'Timed', order: 'Order', mixed: 'Mixed' };
+                const typeEmojis = { score: '🎯', jelly: '🍮', ingredients: '🍒', timed: '⏱️', order: '📋', mixed: '🔥' };
+
+                for (let i = 1; i <= 2000; i++) {
+                    const world = this.getWorldForLevel(i);
+                    const progress = (i - 1) / 1999;
+
+                    // Determine level type based on progression
+                    let type = 'score';
+                    if (i > 5) type = Math.random() > 0.6 ? 'jelly' : 'score';
+                    if (i > 15) type = ['score', 'jelly', 'ingredients'][Math.floor(Math.random() * 3)];
+                    if (i > 40) type = types[Math.floor(Math.random() * 4)];
+                    if (i > 80) type = types[Math.floor(Math.random() * 5)];
+                    if (i > 150) type = types[Math.floor(Math.random() * 6)];
+
+                    // Grid size progression
+                    let gridSize = 8;
+                    if (i > 50) gridSize = Math.random() > 0.7 ? 9 : 8;
+                    if (i > 200) gridSize = [8, 8, 9, 9, 10][Math.floor(Math.random() * 5)];
+                    if (i > 500) gridSize = [8, 9, 9, 10, 10][Math.floor(Math.random() * 5)];
+                    if (i > 1000) gridSize = [9, 9, 10, 10, 10][Math.floor(Math.random() * 5)];
+
+                    // Colors progression
+                    let colors = Math.min(6, 4 + Math.floor(i / 100));
+                    if (i > 300) colors = Math.min(6, 5 + Math.floor((i - 300) / 200));
+
+                    // Target score progression (exponential)
+                    const baseTarget = 1000 + (i * 150) + Math.floor(Math.pow(i, 1.5) * 10);
+                    const target = Math.floor(baseTarget * (0.8 + Math.random() * 0.4));
+
+                    // Moves progression (decreasing)
+                    let moves = Math.max(15, 35 - Math.floor(i / 50));
+                    if (type === 'timed') moves = Math.max(30, 90 - Math.floor(i / 20));
+
+                    // Obstacles progression
+                    let obstacles = 0, obstacleType = null;
+                    if (i > 10) {
+                        const obsTypes = ['rock', 'ice', 'chocolate', 'cage', 'marmalade', 'cake', 'bomb', 'licorice'];
+                        obstacleType = obsTypes[Math.min(Math.floor((i - 10) / 50), obsTypes.length - 1)];
+                        obstacles = Math.min(Math.floor(gridSize * gridSize * 0.3), Math.floor(i / 5));
+                    }
+                    if (i > 100) obstacles = Math.min(Math.floor(gridSize * gridSize * 0.4), Math.floor(i / 3));
+                    if (i > 500) obstacles = Math.min(Math.floor(gridSize * gridSize * 0.5), Math.floor(i / 2));
+
+                    // Jelly for jelly levels
+                    let jelly = 0, jellyDouble = 0;
+                    if (type === 'jelly' || type === 'mixed') {
+                        jelly = Math.floor(gridSize * gridSize * (0.3 + Math.random() * 0.3));
+                        if (i > 100) jellyDouble = Math.floor(jelly * 0.3);
+                    }
+
+                    // Ingredients for ingredient levels
+                    let ingredients = 0;
+                    if (type === 'ingredients' || type === 'mixed') {
+                        ingredients = Math.min(5, 1 + Math.floor(i / 50));
+                    }
+
+                    // Orders for order levels
+                    let orders = null;
+                    if (type === 'order' || type === 'mixed') {
+                        const orderTypes = ['🍬', '🍭', '🍫', '🍩', '🍪', '🧁'].slice(0, colors);
+                        orders = [];
+                        const numOrders = Math.min(3, 1 + Math.floor(i / 100));
+                        for (let o = 0; o < numOrders; o++) {
+                            orders.push({
+                                type: orderTypes[Math.floor(Math.random() * orderTypes.length)],
+                                count: Math.floor(10 + Math.random() * 20 + i / 10)
+                            });
+                        }
+                    }
+
+                    // Special candy chance
+                    let specialChance = Math.min(0.25, 0.05 + i * 0.0005);
+
+                    // Teleporters for high levels
+                    let teleporters = null;
+                    if (i > 200 && Math.random() > 0.7) {
+                        teleporters = [];
+                        const pairs = Math.min(3, 1 + Math.floor((i - 200) / 100));
+                        for (let t = 0; t < pairs; t++) {
+                            teleporters.push({
+                                in: { r: Math.floor(Math.random() * gridSize), c: Math.floor(Math.random() * gridSize) },
+                                out: { r: Math.floor(Math.random() * gridSize), c: Math.floor(Math.random() * gridSize) }
+                            });
+                        }
+                    }
+
+                    levels.push({
+                        id: i,
+                        world: world.id,
+                        worldName: world.name,
+                        name: `${world.name} - Level ${i}`,
+                        type: type,
+                        typeName: typeNames[type],
+                        typeEmoji: typeEmojis[type],
+                        difficulty: this.getDifficulty(i),
+                        target: target,
+                        moves: moves,
+                        gridSize: gridSize,
+                        colors: colors,
+                        obstacles: obstacles,
+                        obstacleType: obstacleType,
+                        jelly: jelly,
+                        jellyDouble: jellyDouble,
+                        ingredients: ingredients,
+                        orders: orders,
+                        specialChance: specialChance,
+                        teleporters: teleporters,
+                        timeLimit: type === 'timed' ? Math.max(30, 120 - Math.floor(i / 10)) : null,
+                        starThresholds: [
+                            Math.floor(target * 1.0),
+                            Math.floor(target * 1.5),
+                            Math.floor(target * 2.0)
+                        ]
+                    });
+                }
+
+                return levels;
+            }
+
+            getWorldForLevel(levelId) {
+                for (let world of this.worlds) {
+                    const [start, end] = world.levels.split('-').map(Number);
+                    if (levelId >= start && levelId <= end) return world;
+                }
+                return this.worlds[this.worlds.length - 1];
+            }
+
+            getDifficulty(levelId) {
+                if (levelId <= 20) return 'Very Easy';
+                if (levelId <= 50) return 'Easy';
+                if (levelId <= 100) return 'Medium';
+                if (levelId <= 200) return 'Hard';
+                if (levelId <= 500) return 'Very Hard';
+                if (levelId <= 1000) return 'Expert';
+                if (levelId <= 1500) return 'Master';
+                return 'Legend';
+            }
+
+            getLevel(id) {
+                return this.levels[id - 1] || this.levels[0];
+            }
+        }
+
+        // ==================== BACKEND API ====================
+        class BackendAPI {
+            constructor() {
+                this.baseURL = localStorage.getItem('api_url') || 'https://api.candycrush-game.com';
+                this.mockData = this.generateMockData();
+            }
+
+            generateMockData() {
+                const names = ['Alice', 'Bob', 'Charlie', 'Diana', 'Eve', 'Frank', 'Grace', 'Henry', 'Ivy', 'Jack', 'Kate', 'Leo', 'Mia', 'Noah', 'Olivia'];
+                const data = { alltime: [], weekly: [], top10: [] };
+
+                names.forEach((name, i) => {
+                    const score = Math.floor(Math.random() * 500000) + 10000;
+                    const entry = { 
+                        name, 
+                        score, 
+                        level: Math.floor(Math.random() * 2000) + 1, 
+                        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`,
+                        timestamp: Date.now() - Math.random() * 604800000
+                    };
+                    data.alltime.push({ ...entry, rank: i + 1 });
+                    data.weekly.push({ ...entry, score: Math.floor(score * 0.7), rank: i + 1 });
+                    data.top10.push({ ...entry, score: Math.floor(score * 1.2), rank: i + 1 });
+                });
+
+                return data;
+            }
+
+            async saveScore(userId, score, level) {
+                try {
+                    const response = await fetch(`${this.baseURL}/api/scores`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ userId, score, level, timestamp: Date.now() })
+                    });
+                    return await response.json();
+                } catch (e) {
+                    const scores = JSON.parse(localStorage.getItem('offline_scores') || '[]');
+                    scores.push({ userId, score, level, timestamp: Date.now() });
+                    localStorage.setItem('offline_scores', JSON.stringify(scores));
+                    return { success: true, offline: true };
+                }
+            }
+
+            async getLeaderboard(type = 'alltime') {
+                try {
+                    const response = await fetch(`${this.baseURL}/api/leaderboard/${type}`);
+                    return await response.json();
+                } catch (e) {
+                    return new Promise(resolve => setTimeout(() => resolve(this.mockData[type] || []), 300));
+                }
+            }
+
+            async saveProgress(userId, progress) {
+                localStorage.setItem(`progress_${userId}`, JSON.stringify(progress));
+                try {
+                    await fetch(`${this.baseURL}/api/progress`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ userId, progress })
+                    });
+                } catch (e) {}
+                return { success: true };
+            }
+
+            async getProgress(userId) {
+                const local = localStorage.getItem(`progress_${userId}`);
+                try {
+                    const response = await fetch(`${this.baseURL}/api/progress/${userId}`);
+                    const remote = await response.json();
+                    if (remote && remote.timestamp > (local ? JSON.parse(local).timestamp : 0)) return remote;
+                } catch (e) {}
+                return local ? JSON.parse(local) : null;
+            }
+        }
+
+        // ==================== GAME ENGINE ====================
+        class CandyCrushGame {
+            constructor() {
+                this.board = [];
+                this.rows = 8;
+                this.cols = 8;
+                this.candies = ['🍬', '🍭', '🍫', '🍩', '🍪', '🧁'];
+                this.selectedCell = null;
+                this.score = 0;
+                this.level = 1;
+                this.moves = 30;
+                this.target = 1000;
+                this.isProcessing = false;
+                this.combo = 0;
+                this.audio = new AudioEngine();
+                this.api = new BackendAPI();
+                this.levelSystem = new LevelSystem();
+                this.user = null;
+                this.soundEnabled = true;
+                this.musicEnabled = true;
+                this.vibrationEnabled = true;
+
+                // New features
+                this.coins = 100;
+                this.lives = 5;
+                this.maxLives = 5;
+                this.livesTimer = null;
+                this.livesRefillTime = 30 * 60 * 1000;
+                this.boosts = { hammer: 3, shuffle: 2, bomb: 1, extraMoves: 2 };
+                this.achievements = [];
+                this.dailyStreak = 0;
+                this.lastDailyClaim = 0;
+                this.levelStars = {};
+                this.activeBoost = null;
+
+                // Level-specific tracking
+                this.jellyRemaining = 0;
+                this.jellyDoubleRemaining = 0;
+                this.ingredientsRemaining = 0;
+                this.ingredientsDropped = 0;
+                this.ordersRemaining = [];
+                this.timeRemaining = null;
+                this.gameTimer = null;
+
+                this.init();
+            }
+
+            init() {
+                this.loadProgress();
+                this.startLivesTimer();
+                this.applyLevelConfig();
+                this.createBoard();
+                this.renderBoard();
+                this.setupEventListeners();
+                this.createBackgroundParticles();
+                this.updateUI();
+                this.checkDailyReward();
+                this.initAchievements();
+
+                // Start game timer for timed levels
+                this.startGameTimer();
+
+                setTimeout(() => this.checkAndClearMatches(), 500);
+            }
+
+            loadProgress() {
+                const saved = localStorage.getItem('candy_crush_progress');
+                if (saved) {
+                    const data = JSON.parse(saved);
+                    this.level = data.level || 1;
+                    this.coins = data.coins || 100;
+                    this.lives = data.lives !== undefined ? data.lives : 5;
+                    this.boosts = data.boosts || this.boosts;
+                    this.levelStars = data.levelStars || {};
+                    this.dailyStreak = data.dailyStreak || 0;
+                    this.lastDailyClaim = data.lastDailyClaim || 0;
+                    this.achievements = data.achievements || [];
+                }
+            }
+
+            applyLevelConfig() {
+                const config = this.levelSystem.getLevel(this.level);
+                this.target = config.target;
+                this.moves = config.moves;
+                this.rows = config.gridSize;
+                this.cols = config.gridSize;
+                this.timeRemaining = config.timeLimit;
+
+                // Reset level-specific counters
+                this.jellyRemaining = config.jelly;
+                this.jellyDoubleRemaining = config.jellyDouble;
+                this.ingredientsRemaining = config.ingredients;
+                this.ingredientsDropped = 0;
+                this.ordersRemaining = config.orders ? JSON.parse(JSON.stringify(config.orders)) : [];
+
+                this.updateObjectives();
+            }
+
+            updateObjectives() {
+                const config = this.levelSystem.getLevel(this.level);
+                const panel = document.getElementById('objectives-panel');
+                const list = document.getElementById('objectives-list');
+
+                if (config.type === 'score') {
+                    panel.classList.add('hidden');
+                    return;
+                }
+
+                panel.classList.remove('hidden');
+                let html = '';
+
+                if (config.type === 'jelly' || config.type === 'mixed') {
+                    const total = config.jelly + config.jellyDouble;
+                    const remaining = this.jellyRemaining + this.jellyDoubleRemaining;
+                    html += `<div class="objective-item ${remaining <= 0 ? 'completed' : ''}">🍮 Clear Jelly: ${remaining}/${total}</div>`;
+                }
+
+                if (config.type === 'ingredients' || config.type === 'mixed') {
+                    html += `<div class="objective-item ${this.ingredientsDropped >= config.ingredients ? 'completed' : ''}">🍒 Drop Ingredients: ${this.ingredientsDropped}/${config.ingredients}</div>`;
+                }
+
+                if (config.type === 'timed') {
+                    html += `<div class="objective-item">⏱️ Time: ${this.timeRemaining}s</div>`;
+                }
+
+                if (config.type === 'order' || config.type === 'mixed') {
+                    this.ordersRemaining.forEach(order => {
+                        html += `<div class="objective-item ${order.count <= 0 ? 'completed' : ''}">${order.type} Collect: ${Math.max(0, order.count)}</div>`;
+                    });
+                }
+
+                list.innerHTML = html;
+            }
+
+            createBoard() {
+                const config = this.levelSystem.getLevel(this.level);
+                this.board = [];
+
+                for (let r = 0; r < this.rows; r++) {
+                    this.board[r] = [];
+                    for (let c = 0; c < this.cols; c++) {
+                        this.board[r][c] = this.getRandomCandy(config.colors);
+                    }
+                }
+
+                // Add obstacles
+                if (config.obstacles > 0 && config.obstacleType) {
+                    let placed = 0;
+                    let attempts = 0;
+                    while (placed < config.obstacles && attempts < 1000) {
+                        const r = Math.floor(Math.random() * this.rows);
+                        const c = Math.floor(Math.random() * this.cols);
+                        if (!this.board[r][c].obstacle && !this.board[r][c].jelly && !this.board[r][c].ingredient) {
+                            this.board[r][c].obstacle = config.obstacleType;
+                            placed++;
+                        }
+                        attempts++;
+                    }
+                }
+
+                // Add jelly
+                if (config.jelly > 0) {
+                    let placed = 0;
+                    while (placed < config.jelly) {
+                        const r = Math.floor(Math.random() * this.rows);
+                        const c = Math.floor(Math.random() * this.cols);
+                        if (!this.board[r][c].obstacle && !this.board[r][c].jelly) {
+                            this.board[r][c].jelly = 'single';
+                            placed++;
+                        }
+                    }
+                }
+
+                // Add double jelly
+                if (config.jellyDouble > 0) {
+                    let placed = 0;
+                    while (placed < config.jellyDouble) {
+                        const r = Math.floor(Math.random() * this.rows);
+                        const c = Math.floor(Math.random() * this.cols);
+                        if (!this.board[r][c].obstacle && !this.board[r][c].jelly) {
+                            this.board[r][c].jelly = 'double';
+                            placed++;
+                        }
+                    }
+                }
+
+                // Place ingredients
+                if (config.ingredients > 0) {
+                    for (let i = 0; i < config.ingredients; i++) {
+                        const r = Math.floor(Math.random() * 3);
+                        const c = Math.floor(Math.random() * this.cols);
+                        if (!this.board[r][c].obstacle && !this.board[r][c].ingredient) {
+                            this.board[r][c].ingredient = i % 2 === 0 ? 'cherry' : 'hazelnut';
+                        }
+                    }
+                }
+
+                // Place teleporters
+                if (config.teleporters) {
+                    config.teleporters.forEach(tp => {
+                        if (this.isValidCell(tp.in.r, tp.in.c)) {
+                            this.board[tp.in.r][tp.in.c].teleporter = 'in';
+                            this.board[tp.in.r][tp.in.c].teleportTarget = tp.out;
+                        }
+                        if (this.isValidCell(tp.out.r, tp.out.c)) {
+                            this.board[tp.out.r][tp.out.c].teleporter = 'out';
+                        }
+                    });
+                }
+
+                // Ensure no initial matches
+                while (this.findMatches().length > 0) {
+                    this.board = [];
+                    for (let r = 0; r < this.rows; r++) {
+                        this.board[r] = [];
+                        for (let c = 0; c < this.cols; c++) {
+                            this.board[r][c] = this.getRandomCandy(config.colors);
+                        }
+                    }
+                }
+            }
+
+            isValidCell(r, c) {
+                return r >= 0 && r < this.rows && c >= 0 && c < this.cols;
+            }
+
+            getRandomCandy(colorCount = 6) {
+                const types = this.candies.slice(0, colorCount);
+                return {
+                    type: types[Math.floor(Math.random() * types.length)],
+                    special: null,
+                    obstacle: null,
+                    jelly: null,
+                    ingredient: null,
+                    teleporter: null,
+                    teleportTarget: null,
+                    id: Math.random().toString(36).substr(2, 9)
+                };
+            }
+
+            renderBoard() {
+                const boardEl = document.getElementById('game-board');
+                boardEl.innerHTML = '';
+                boardEl.style.gridTemplateColumns = `repeat(${this.cols}, 1fr)`;
+
+                for (let r = 0; r < this.rows; r++) {
+                    for (let c = 0; c < this.cols; c++) {
+                        const cell = document.createElement('div');
+                        cell.className = 'cell';
+                        cell.dataset.row = r;
+                        cell.dataset.col = c;
+
+                        const data = this.board[r][c];
+
+                        if (data.obstacle) {
+                            cell.classList.add(`obstacle-${data.obstacle}`);
+                            cell.textContent = '';
+                        } else if (data.teleporter) {
+                            cell.classList.add(`teleporter-${data.teleporter}`);
+                            cell.textContent = '';
+                        } else {
+                            cell.textContent = data.type;
+
+                            if (data.ingredient) {
+                                cell.classList.add(`ingredient-${data.ingredient}`);
+                            }
+
+                            if (data.jelly === 'single') {
+                                cell.classList.add('jelly-single');
+                            } else if (data.jelly === 'double') {
+                                cell.classList.add('jelly-double');
+                            }
+
+                            if (data.special) {
+                                cell.classList.add(`special-${data.special}`);
+                            }
+                        }
+
+                        cell.addEventListener('click', (e) => this.handleCellClick(r, c, e));
+                        cell.addEventListener('touchstart', (e) => {
+                            e.preventDefault();
+                            this.handleCellClick(r, c, e);
+                        }, { passive: false });
+
+                        boardEl.appendChild(cell);
+                    }
+                }
+            }
+
+            async handleCellClick(row, col, event) {
+                if (this.isProcessing || this.moves <= 0 || this.lives <= 0) return;
+                if (!this.audio.initialized) this.audio.init();
+
+                const cellEl = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+
+                // Handle boost mode
+                if (this.activeBoost) {
+                    this.executeBoost(row, col);
+                    return;
+                }
+
+                if (this.board[row][col].obstacle) {
+                    cellEl.classList.add('shake');
+                    setTimeout(() => cellEl.classList.remove('shake'), 300);
+                    this.audio.playInvalid();
+                    return;
+                }
+
+                if (!this.selectedCell) {
+                    this.selectedCell = { row, col };
+                    cellEl.classList.add('selected');
+                    this.audio.playSwap();
+                } else {
+                    const prev = this.selectedCell;
+                    const prevEl = document.querySelector(`[data-row="${prev.row}"][data-col="${prev.col}"]`);
+                    prevEl.classList.remove('selected');
+                    this.selectedCell = null;
+
+                    if (prev.row === row && prev.col === col) return;
+
+                    if (this.isAdjacent(prev, { row, col })) {
+                        await this.swapCandies(prev, { row, col });
+                    } else {
+                        cellEl.classList.add('shake');
+                        setTimeout(() => cellEl.classList.remove('shake'), 300);
+                        this.audio.playInvalid();
+                    }
+                }
+            }
+
+            isAdjacent(a, b) {
+                return Math.abs(a.row - b.row) + Math.abs(a.col - b.col) === 1;
+            }
+
+            async swapCandies(a, b) {
+                this.isProcessing = true;
+
+                if (this.board[a.row][a.col].obstacle || this.board[b.row][b.col].obstacle) {
+                    this.isProcessing = false;
+                    return;
+                }
+
+                const temp = this.board[a.row][a.col];
+                this.board[a.row][a.col] = this.board[b.row][b.col];
+                this.board[b.row][b.col] = temp;
+
+                this.renderBoard();
+                this.audio.playSwap();
+
+                const matches = this.findMatches();
+
+                if (matches.length > 0) {
+                    this.moves--;
+                    this.updateUI();
+                    await this.processMatches(matches);
+                } else {
+                    await new Promise(r => setTimeout(r, 300));
+                    const temp2 = this.board[a.row][a.col];
+                    this.board[a.row][a.col] = this.board[b.row][b.col];
+                    this.board[b.row][b.col] = temp2;
+                    this.renderBoard();
+
+                    const cellA = document.querySelector(`[data-row="${a.row}"][data-col="${a.col}"]`);
+                    cellA.classList.add('shake');
+                    setTimeout(() => cellA.classList.remove('shake'), 300);
+                    this.audio.playInvalid();
+                }
+
+                this.isProcessing = false;
+
+                if (this.moves <= 0 && !this.checkWinCondition()) {
+                    setTimeout(() => this.gameOver(), 1000);
+                }
+            }
+
+            findMatches() {
+                const matches = [];
+
+                for (let r = 0; r < this.rows; r++) {
+                    for (let c = 0; c < this.cols - 2; c++) {
+                        if (this.board[r][c].obstacle) continue;
+                        const type = this.board[r][c].type;
+                        if (type && type === this.board[r][c+1].type && !this.board[r][c+1].obstacle && 
+                            type === this.board[r][c+2].type && !this.board[r][c+2].obstacle) {
+                            const match = [{r, c}, {r, c: c+1}, {r, c: c+2}];
+                            let k = c + 3;
+                            while (k < this.cols && this.board[r][k].type === type && !this.board[r][k].obstacle) {
+                                match.push({r, c: k});
+                                k++;
+                            }
+                            matches.push(match);
+                            c = k - 1;
+                        }
+                    }
+                }
+
+                for (let c = 0; c < this.cols; c++) {
+                    for (let r = 0; r < this.rows - 2; r++) {
+                        if (this.board[r][c].obstacle) continue;
+                        const type = this.board[r][c].type;
+                        if (type && type === this.board[r+1][c].type && !this.board[r+1][c].obstacle && 
+                            type === this.board[r+2][c].type && !this.board[r+2][c].obstacle) {
+                            const match = [{r, c}, {r: r+1, c}, {r: r+2, c}];
+                            let k = r + 3;
+                            while (k < this.rows && this.board[k][c].type === type && !this.board[k][c].obstacle) {
+                                match.push({r: k, c});
+                                k++;
+                            }
+                            matches.push(match);
+                            r = k - 1;
+                        }
+                    }
+                }
+
+                return matches;
+            }
+
+            async processMatches(matches) {
+                this.combo++;
+
+                let points = 0;
+                const cellsToRemove = new Set();
+                const specialCandies = [];
+                const obstaclesHit = [];
+                const jellyCleared = [];
+
+                matches.forEach(match => {
+                    points += match.length * 10 * this.combo;
+
+                    if (match.length === 4) {
+                        const isHorizontal = match[0].r === match[1].r;
+                        const middle = match[Math.floor(match.length / 2)];
+                        specialCandies.push({
+                            r: middle.r,
+                            c: middle.c,
+                            special: isHorizontal ? 'striped_h' : 'striped_v',
+                            type: this.board[middle.r][middle.c].type
+                        });
+                    } else if (match.length >= 5) {
+                        const middle = match[Math.floor(match.length / 2)];
+                        specialCandies.push({
+                            r: middle.r,
+                            c: middle.c,
+                            special: 'color_bomb',
+                            type: '🌈'
+                        });
+                    }
+
+                    match.forEach(m => {
+                        cellsToRemove.add(`${m.r},${m.c}`);
+
+                        // Check adjacent obstacles
+                        [[-1,0], [1,0], [0,-1], [0,1]].forEach(([dr, dc]) => {
+                            const nr = m.r + dr, nc = m.c + dc;
+                            if (this.isValidCell(nr, nc) && this.board[nr][nc].obstacle) {
+                                obstaclesHit.push(`${nr},${nc}`);
+                            }
+                        });
+
+                        // Check jelly
+                        if (this.board[m.r][m.c].jelly) {
+                            jellyCleared.push(`${m.r},${m.c}`);
+                        }
+                    });
+                });
+
+                this.score += points;
+                this.showScorePopup(points);
+                this.audio.playMatch();
+
+                if (this.combo > 1) {
+                    this.showComboText();
+                    this.audio.playSpecial();
+                }
+
+                if (this.vibrationEnabled && navigator.vibrate) navigator.vibrate(50);
+
+                // Animate matches
+                cellsToRemove.forEach(key => {
+                    const [r, c] = key.split(',').map(Number);
+                    const cell = document.querySelector(`[data-row="${r}"][data-col="${c}"]`);
+                    if (cell) {
+                        cell.classList.add('matched');
+                        this.createParticles(r, c, this.board[r][c].type);
+                    }
+                });
+
+                await new Promise(r => setTimeout(r, 400));
+
+                // Process jelly clearing
+                jellyCleared.forEach(key => {
+                    const [r, c] = key.split(',').map(Number);
+                    if (this.board[r][c].jelly === 'double') {
+                        this.board[r][c].jelly = 'single';
+                        this.jellyDoubleRemaining--;
+                    } else if (this.board[r][c].jelly === 'single') {
+                        this.board[r][c].jelly = null;
+                        this.jellyRemaining--;
+                    }
+                });
+
+                // Process obstacle damage
+                const uniqueObstacles = [...new Set(obstaclesHit)];
+                uniqueObstacles.forEach(key => {
+                    const [r, c] = key.split(',').map(Number);
+                    const obs = this.board[r][c].obstacle;
+                    if (obs === 'ice' || obs === 'marmalade' || obs === 'cage') {
+                        this.board[r][c].obstacle = null;
+                        this.audio.playBreak();
+                    }
+                });
+
+                // Remove matched candies
+                cellsToRemove.forEach(key => {
+                    const [r, c] = key.split(',').map(Number);
+
+                    // Handle ingredients falling
+                    if (this.board[r][c].ingredient) {
+                        this.checkIngredientDrop(r, c);
+                    }
+
+                    this.board[r][c] = null;
+                });
+
+                // Add special candies
+                specialCandies.forEach(s => {
+                    if (!cellsToRemove.has(`${s.r},${s.c}`) && this.board[s.r] && this.board[s.r][s.c]) {
+                        this.board[s.r][s.c] = {
+                            type: s.type,
+                            special: s.special,
+                            obstacle: null,
+                            jelly: this.board[s.r][s.c].jelly,
+                            ingredient: null,
+                            teleporter: null,
+                            id: Math.random().toString(36).substr(2, 9)
+                        };
+                    }
+                });
+
+                await this.dropCandies();
+                this.fillEmpty();
+                this.renderBoard();
+
+                this.updateObjectives();
+
+                const newMatches = this.findMatches();
+                if (newMatches.length > 0) {
+                    await new Promise(r => setTimeout(r, 300));
+                    await this.processMatches(newMatches);
+                } else {
+                    this.combo = 0;
+                }
+
+                this.updateUI();
+
+                if (this.checkWinCondition()) {
+                    setTimeout(() => this.levelComplete(), 500);
+                }
+            }
+
+            checkIngredientDrop(row, col) {
+                // Check if ingredient reached bottom
+                if (row === this.rows - 1) {
+                    this.ingredientsDropped++;
+                    this.ingredientsRemaining--;
+                    this.showToast('🍒 Ingredient dropped!');
+                    return;
+                }
+
+                // Check if there's a path down
+                let r = row;
+                while (r < this.rows - 1 && !this.board[r + 1][col] && !this.board[r + 1][col]?.obstacle) {
+                    r++;
+                }
+
+                if (r === this.rows - 1) {
+                    this.ingredientsDropped++;
+                    this.ingredientsRemaining--;
+                    this.showToast('🍒 Ingredient dropped!');
+                }
+            }
+
+            checkWinCondition() {
+                const config = this.levelSystem.getLevel(this.level);
+
+                if (config.type === 'score') {
+                    return this.score >= this.target;
+                } else if (config.type === 'jelly') {
+                    return this.jellyRemaining <= 0 && this.jellyDoubleRemaining <= 0;
+                } else if (config.type === 'ingredients') {
+                    return this.ingredientsDropped >= config.ingredients;
+                } else if (config.type === 'timed') {
+                    return this.score >= this.target;
+                } else if (config.type === 'order') {
+                    return this.ordersRemaining.every(o => o.count <= 0);
+                } else if (config.type === 'mixed') {
+                    let jellyClear = this.jellyRemaining <= 0 && this.jellyDoubleRemaining <= 0;
+                    let ingClear = config.ingredients === 0 || this.ingredientsDropped >= config.ingredients;
+                    let orderClear = !this.ordersRemaining || this.ordersRemaining.every(o => o.count <= 0);
+                    return jellyClear && ingClear && orderClear && this.score >= this.target * 0.5;
+                }
+
+                return false;
+            }
+
+            async dropCandies() {
+                for (let c = 0; c < this.cols; c++) {
+                    let emptySlots = 0;
+                    for (let r = this.rows - 1; r >= 0; r--) {
+                        if (this.board[r][c] === null) {
+                            emptySlots++;
+                        } else if (emptySlots > 0) {
+                            this.board[r + emptySlots][c] = this.board[r][c];
+                            this.board[r][c] = null;
+                        }
+                    }
+                }
+            }
+
+            fillEmpty() {
+                const config = this.levelSystem.getLevel(this.level);
+                for (let r = 0; r < this.rows; r++) {
+                    for (let c = 0; c < this.cols; c++) {
+                        if (this.board[r][c] === null) {
+                            this.board[r][c] = this.getRandomCandy(config.colors);
+                        }
+                    }
+                }
+            }
+
+            createParticles(row, col, type) {
+                const boardEl = document.getElementById('game-board');
+                const cell = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+                if (!cell) return;
+
+                const rect = cell.getBoundingClientRect();
+                const boardRect = boardEl.getBoundingClientRect();
+
+                const colors = {
+                    '🍬': '#ff6b9d', '🍭': '#c44569', '🍫': '#8b4513',
+                    '🍩': '#f8a5c2', '🍪': '#d4a373', '🧁': '#fd79a8'
+                };
+
+                for (let i = 0; i < 6; i++) {
+                    const particle = document.createElement('div');
+                    particle.className = 'particle';
+                    particle.style.background = colors[type] || '#fff';
+                    particle.style.left = (rect.left - boardRect.left + rect.width / 2) + 'px';
+                    particle.style.top = (rect.top - boardRect.top + rect.height / 2) + 'px';
+
+                    const angle = (Math.PI * 2 * i) / 6;
+                    const velocity = 50 + Math.random() * 50;
+                    const vx = Math.cos(angle) * velocity;
+                    const vy = Math.sin(angle) * velocity;
+
+                    boardEl.appendChild(particle);
+
+                    let posX = 0, posY = 0;
+                    let opacity = 1;
+
+                    const animate = () => {
+                        posX += vx * 0.02;
+                        posY += vy * 0.02 + 2;
+                        opacity -= 0.02;
+                        particle.style.transform = `translate(${posX}px, ${posY}px)`;
+                        particle.style.opacity = opacity;
+                        if (opacity > 0) requestAnimationFrame(animate);
+                        else particle.remove();
+                    };
+
+                    requestAnimationFrame(animate);
+                }
+            }
+
+            showScorePopup(points) {
+                const boardEl = document.getElementById('game-board');
+                const popup = document.createElement('div');
+                popup.className = 'score-popup';
+                popup.textContent = `+${points}`;
+                popup.style.left = '50%';
+                popup.style.top = '40%';
+                boardEl.appendChild(popup);
+                setTimeout(() => popup.remove(), 1000);
+            }
+
+            showComboText() {
+                const indicator = document.getElementById('combo-indicator');
+                const text = indicator.querySelector('.combo-text');
+                text.textContent = `COMBO x${this.combo}!`;
+                indicator.classList.remove('hidden');
+                setTimeout(() => indicator.classList.add('hidden'), 1500);
+            }
+
+            checkAndClearMatches() {
+                const matches = this.findMatches();
+                if (matches.length > 0) this.processMatches(matches);
+            }
+
+            // ==================== GAME TIMER ====================
+            startGameTimer() {
+                if (this.gameTimer) clearInterval(this.gameTimer);
+
+                const config = this.levelSystem.getLevel(this.level);
+                if (config.type !== 'timed') return;
+
+                this.gameTimer = setInterval(() => {
+                    if (this.timeRemaining > 0) {
+                        this.timeRemaining--;
+                        this.updateObjectives();
+
+                        if (this.timeRemaining <= 0 && !this.checkWinCondition()) {
+                            this.gameOver();
+                        }
+                    }
+                }, 1000);
+            }
+
+            stopGameTimer() {
+                if (this.gameTimer) {
+                    clearInterval(this.gameTimer);
+                    this.gameTimer = null;
+                }
+            }
+
+            // ==================== BOOSTS ====================
+            useBoost(type) {
+                if (this.boosts[type] <= 0) {
+                    this.showToast('No boosts left! Visit shop.');
+                    return;
+                }
+
+                if (type === 'hammer') {
+                    this.activeBoost = 'hammer';
+                    this.showToast('🔨 Tap any candy or obstacle to smash!');
+                } else if (type === 'shuffle') {
+                    this.shuffleBoard();
+                } else if (type === 'bomb') {
+                    this.activeBoost = 'bomb';
+                    this.showToast('💣 Tap to explode 3x3 area!');
+                } else if (type === 'extraMoves') {
+                    this.moves += 5;
+                    this.boosts.extraMoves--;
+                    this.audio.playBoost();
+                    this.updateUI();
+                    this.showToast('➕5 Moves added!');
+                    this.saveGameData();
+                }
+            }
+
+            executeBoost(row, col) {
+                if (this.activeBoost === 'hammer') {
+                    this.board[row][col] = null;
+                    this.boosts.hammer--;
+                    this.audio.playBoost();
+                    this.dropCandies();
+                    this.fillEmpty();
+                    this.renderBoard();
+                } else if (this.activeBoost === 'bomb') {
+                    for (let r = Math.max(0, row - 1); r <= Math.min(this.rows - 1, row + 1); r++) {
+                        for (let c = Math.max(0, col - 1); c <= Math.min(this.cols - 1, col + 1); c++) {
+                            this.board[r][c] = null;
+                        }
+                    }
+                    this.boosts.bomb--;
+                    this.audio.playBoost();
+                    this.dropCandies();
+                    this.fillEmpty();
+                    this.renderBoard();
+                }
+
+                this.activeBoost = null;
+                this.saveGameData();
+                setTimeout(() => this.checkAndClearMatches(), 500);
+            }
+
+            shuffleBoard() {
+                const candies = [];
+                for (let r = 0; r < this.rows; r++) {
+                    for (let c = 0; c < this.cols; c++) {
+                        if (!this.board[r][c].obstacle && !this.board[r][c].teleporter) {
+                            candies.push({...this.board[r][c]});
+                        }
+                    }
+                }
+
+                for (let i = candies.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [candies[i], candies[j]] = [candies[j], candies[i]];
+                }
+
+                let idx = 0;
+                for (let r = 0; r < this.rows; r++) {
+                    for (let c = 0; c < this.cols; c++) {
+                        if (!this.board[r][c].obstacle && !this.board[r][c].teleporter) {
+                            const oldJelly = this.board[r][c].jelly;
+                            this.board[r][c] = candies[idx++];
+                            this.board[r][c].jelly = oldJelly;
+                        }
+                    }
+                }
+
+                this.boosts.shuffle--;
+                this.audio.playBoost();
+                this.renderBoard();
+                this.saveGameData();
+                this.showToast('🔀 Board Shuffled!');
+            }
+
+            buyExtraMoves() {
+                if (this.coins >= 50) {
+                    this.coins -= 50;
+                    this.moves += 5;
+                    this.updateUI();
+                    this.closeModal('gameover-modal');
+                    this.audio.playCoin();
+                    this.saveGameData();
+                } else {
+                    this.showToast('Not enough coins!');
+                }
+            }
+
+            // ==================== LIVES SYSTEM ====================
+            startLivesTimer() {
+                if (this.livesTimer) clearInterval(this.livesTimer);
+
+                this.livesTimer = setInterval(() => {
+                    if (this.lives < this.maxLives) {
+                        const now = Date.now();
+                        const lastLost = parseInt(localStorage.getItem('last_life_lost') || '0');
+                        const elapsed = now - lastLost;
+
+                        if (elapsed >= this.livesRefillTime) {
+                            this.lives++;
+                            localStorage.setItem('last_life_lost', now.toString());
+                            this.updateUI();
+                            this.saveGameData();
+                        } else {
+                            this.updateLivesTimer(this.livesRefillTime - elapsed);
+                        }
+                    }
+                }, 1000);
+            }
+
+            updateLivesTimer(remaining) {
+                const timerEl = document.getElementById('lives-timer');
+                if (this.lives >= this.maxLives) {
+                    timerEl.classList.add('hidden');
+                    return;
+                }
+                timerEl.classList.remove('hidden');
+                const mins = Math.floor(remaining / 60000);
+                const secs = Math.floor((remaining % 60000) / 1000);
+                timerEl.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+            }
+
+            loseLife() {
+                if (this.lives > 0) {
+                    this.lives--;
+                    localStorage.setItem('last_life_lost', Date.now().toString());
+                    this.updateUI();
+                    this.saveGameData();
+                }
+            }
+
+            // ==================== DAILY REWARDS ====================
+            checkDailyReward() {
+                const now = Date.now();
+                const lastClaim = this.lastDailyClaim;
+                const oneDay = 24 * 60 * 60 * 1000;
+
+                if (now - lastClaim >= oneDay) {
+                    if (now - lastClaim < 2 * oneDay) {
+                        this.dailyStreak = Math.min(this.dailyStreak + 1, 7);
+                    } else {
+                        this.dailyStreak = 1;
+                    }
+                }
+            }
+
+            showDailyReward() {
+                const now = Date.now();
+                const oneDay = 24 * 60 * 60 * 1000;
+
+                if (now - this.lastDailyClaim < oneDay) {
+                    const remaining = oneDay - (now - this.lastDailyClaim);
+                    const hours = Math.floor(remaining / 3600000);
+                    const mins = Math.floor((remaining % 3600000) / 60000);
+                    this.showToast(`Come back in ${hours}h ${mins}m`);
+                    return;
+                }
+
+                const rewards = [50, 75, 100, 150, 200, 300, 500];
+                const reward = rewards[Math.min(this.dailyStreak, 6)];
+
+                document.getElementById('daily-reward-amount').textContent = `+${reward} Coins`;
+                document.getElementById('daily-streak').textContent = this.dailyStreak;
+
+                const calendar = document.getElementById('daily-calendar');
+                calendar.innerHTML = '';
+                for (let i = 1; i <= 7; i++) {
+                    const day = document.createElement('div');
+                    day.className = `p-2 rounded-lg text-center text-xs ${i <= this.dailyStreak ? 'bg-green-500/50' : 'bg-white/10'}`;
+                    day.innerHTML = `Day ${i}<br>${rewards[i-1]}🪙`;
+                    calendar.appendChild(day);
+                }
+
+                this.showModal('daily-modal');
+            }
+
+            claimDailyReward() {
+                const rewards = [50, 75, 100, 150, 200, 300, 500];
+                const reward = rewards[Math.min(this.dailyStreak, 6)];
+
+                this.coins += reward;
+                this.lastDailyClaim = Date.now();
+                this.dailyStreak = Math.min(this.dailyStreak + 1, 7);
+
+                this.audio.playCoin();
+                this.updateUI();
+                this.saveGameData();
+                this.closeModal('daily-modal');
+                this.showToast(`+${reward} Coins claimed!`);
+            }
+
+            // ==================== SHOP ====================
+            showShop() {
+                const items = [
+                    { id: 'hammer', name: 'Hammer', icon: '🔨', desc: 'Smash anything', price: 30, count: 3 },
+                    { id: 'shuffle', name: 'Shuffle', icon: '🔀', desc: 'Shuffle board', price: 50, count: 2 },
+                    { id: 'bomb', name: 'Bomb', icon: '💣', desc: 'Explode 3x3', price: 40, count: 2 },
+                    { id: 'moves', name: '+5 Moves', icon: '➕', desc: 'Extra 5 moves', price: 50, count: 3 },
+                    { id: 'lives', name: 'Full Lives', icon: '❤️', desc: 'Refill lives', price: 100, count: 5 },
+                    { id: 'coins', name: 'Coin Pack', icon: '💰', desc: '500 coins', price: 0, count: 500 }
+                ];
+
+                const container = document.getElementById('shop-items');
+                container.innerHTML = items.map(item => `
+                    <div class="shop-item" onclick="game.buyItem('${item.id}', ${item.price}, ${item.count})">
+                        <div class="text-3xl mb-2">${item.icon}</div>
+                        <p class="font-bold text-sm">${item.name}</p>
+                        <p class="text-xs text-white/60 mb-2">${item.desc}</p>
+                        <p class="font-display text-lg text-yellow-300">${item.price > 0 ? item.price + ' 🪙' : 'Free'}</p>
+                    </div>
+                `).join('');
+
+                this.showModal('shop-modal');
+            }
+
+            buyItem(id, price, count) {
+                if (id === 'coins') {
+                    this.coins += count;
+                    this.audio.playCoin();
+                    this.showToast(`+${count} Coins!`);
+                } else if (id === 'lives') {
+                    if (this.coins >= price) {
+                        this.coins -= price;
+                        this.lives = this.maxLives;
+                        this.audio.playCoin();
+                        this.showToast('Lives refilled!');
+                    } else {
+                        this.showToast('Not enough coins!');
+                        return;
+                    }
+                } else {
+                    if (this.coins >= price) {
+                        this.coins -= price;
+                        this.boosts[id === 'moves' ? 'extraMoves' : id] += count;
+                        this.audio.playCoin();
+                        this.showToast(`+${count} ${id} added!`);
+                    } else {
+                        this.showToast('Not enough coins!');
+                        return;
+                    }
+                }
+
+                this.updateUI();
+                this.saveGameData();
+            }
+
+            // ==================== ACHIEVEMENTS ====================
+            initAchievements() {
+                const defaultAchievements = [
+                    { id: 'first_win', name: 'First Victory', desc: 'Complete level 1', icon: '🏆', unlocked: false },
+                    { id: 'combo_master', name: 'Combo Master', desc: 'Get a 5x combo', icon: '⚡', unlocked: false },
+                    { id: 'rich', name: 'Coin Collector', desc: 'Collect 1000 coins', icon: '💰', unlocked: false },
+                    { id: 'streak_7', name: 'Weekly Warrior', desc: '7 day streak', icon: '🔥', unlocked: false },
+                    { id: 'level_50', name: 'Half Century', desc: 'Reach level 50', icon: '🎯', unlocked: false },
+                    { id: 'level_100', name: 'Centurion', desc: 'Reach level 100', icon: '💯', unlocked: false },
+                    { id: 'level_500', name: 'Master', desc: 'Reach level 500', icon: '👑', unlocked: false },
+                    { id: 'level_1000', name: 'Legend', desc: 'Reach level 1000', icon: '⭐', unlocked: false },
+                    { id: 'level_2000', name: 'God', desc: 'Complete all 2000 levels', icon: '👁️', unlocked: false },
+                    { id: 'score_10000', name: 'High Scorer', desc: 'Score 10000 in one level', icon: '🎯', unlocked: false },
+                ];
+
+                if (this.achievements.length === 0) {
+                    this.achievements = defaultAchievements;
+                }
+            }
+
+            checkAchievements() {
+                const checks = {
+                    'first_win': this.level > 1,
+                    'combo_master': this.combo >= 5,
+                    'rich': this.coins >= 1000,
+                    'streak_7': this.dailyStreak >= 7,
+                    'level_50': this.level >= 50,
+                    'level_100': this.level >= 100,
+                    'level_500': this.level >= 500,
+                    'level_1000': this.level >= 1000,
+                    'level_2000': this.level > 2000,
+                    'score_10000': this.score >= 10000
+                };
+
+                let newUnlock = false;
+                this.achievements.forEach(ach => {
+                    if (!ach.unlocked && checks[ach.id]) {
+                        ach.unlocked = true;
+                        ach.unlockedAt = Date.now();
+                        newUnlock = true;
+                        this.showToast(`🏅 Achievement: ${ach.name}!`);
+                    }
+                });
+
+                if (newUnlock) this.saveGameData();
+            }
+
+            showAchievements() {
+                const list = document.getElementById('achievements-list');
+                list.innerHTML = this.achievements.map(ach => `
+                    <div class="flex items-center gap-4 p-3 glass-panel ${ach.unlocked ? '' : 'opacity-60'}">
+                        <div class="achievement-badge ${ach.unlocked ? '' : 'locked'}">${ach.icon}</div>
+                        <div class="flex-1">
+                            <p class="font-bold text-sm">${ach.name}</p>
+                            <p class="text-xs text-white/60">${ach.desc}</p>
+                        </div>
+                        ${ach.unlocked ? '<span class="text-green-400 text-xl">✓</span>' : '<span class="text-white/30 text-xl">🔒</span>'}
+                    </div>
+                `).join('');
+
+                this.showModal('achievements-modal');
+            }
+
+            // ==================== WORLD MAP ====================
+            showWorldMap() {
+                const container = document.getElementById('world-map-container');
+                const tabs = document.getElementById('world-tabs');
+
+                tabs.innerHTML = this.levelSystem.worlds.map((world, idx) => `
+                    <button onclick="game.showWorldLevels(${idx})" class="tab-btn ${idx === 0 ? 'active' : ''}" data-world="${idx}">
+                        ${world.emoji} ${world.name}
+                    </button>
+                `).join('');
+
+                this.showWorldLevels(0);
+                this.showModal('worldmap-modal');
+            }
+
+            showWorldLevels(worldIdx) {
+                document.querySelectorAll('#world-tabs .tab-btn').forEach(btn => {
+                    btn.classList.toggle('active', parseInt(btn.dataset.world) === worldIdx);
+                });
+
+                const world = this.levelSystem.worlds[worldIdx];
+                const [start, end] = world.levels.split('-').map(Number);
+                const container = document.getElementById('world-map-container');
+
+                let html = `<div class="world-section">
+                    <div class="world-title">${world.emoji} ${world.name} <span class="text-sm text-white/60">(${world.levels})</span></div>
+                    <div class="world-levels">`;
+
+                for (let i = start; i <= end; i++) {
+                    const stars = this.levelStars[i] || 0;
+                    const isUnlocked = i <= this.level;
+                    const isCompleted = i < this.level;
+                    const config = this.levelSystem.getLevel(i);
+
+                    html += `<button onclick="${isUnlocked ? `game.goToLevel(${i})` : ''}" 
+                        class="world-level-btn ${isCompleted ? 'completed' : isUnlocked ? 'unlocked' : 'locked'}"
+                        title="Level ${i} - ${config.typeName}">
+                        ${isCompleted ? '✓' : i}
+                    </button>`;
+                }
+
+                html += '</div></div>';
+                container.innerHTML = html;
+            }
+
+            goToLevel(levelId) {
+                this.level = levelId;
+                this.closeModal('worldmap-modal');
+                this.restartLevel();
+            }
+
+            // ==================== GAME FLOW ====================
+            levelComplete() {
+                this.stopGameTimer();
+                this.audio.playWin();
+                const config = this.levelSystem.getLevel(this.level);
+
+                let stars = 1;
+                if (this.score >= config.starThresholds[1]) stars = 2;
+                if (this.score >= config.starThresholds[2]) stars = 3;
+
+                const prevStars = this.levelStars[this.level] || 0;
+                this.levelStars[this.level] = Math.max(prevStars, stars);
+
+                const bonus = this.moves * 50 + (stars * 100);
+                this.coins += bonus;
+                this.audio.playCoin();
+
+                document.getElementById('level-score').textContent = this.score.toLocaleString();
+                document.getElementById('level-stars').textContent = '⭐'.repeat(stars);
+                document.getElementById('level-bonus').textContent = `+${bonus}`;
+                document.getElementById('level-complete-msg').textContent = 
+                    stars === 3 ? 'Perfect! Amazing skills!' : stars === 2 ? 'Great job!' : 'Level cleared!';
+
+                this.showModal('level-modal');
+                this.saveGameData();
+            }
+
+            gameOver() {
+                this.stopGameTimer();
+                this.audio.playGameOver();
+                this.loseLife();
+
+                const config = this.levelSystem.getLevel(this.level);
+                let reason = 'You ran out of moves!';
+                if (config.type === 'jelly') reason = 'Jelly not fully cleared!';
+                if (config.type === 'ingredients') reason = 'Ingredients not dropped!';
+                if (config.type === 'timed') reason = 'Time ran out!';
+
+                document.getElementById('gameover-reason').textContent = reason;
+                document.getElementById('final-score').textContent = this.score.toLocaleString();
+                this.showModal('gameover-modal');
+                this.saveGameData();
+            }
+
+            nextLevel() {
+                this.closeModal('level-modal');
+                this.level++;
+                this.applyLevelConfig();
+                this.score = 0;
+                this.combo = 0;
+                this.createBoard();
+                this.renderBoard();
+                this.updateUI();
+                this.startGameTimer();
+                setTimeout(() => this.checkAndClearMatches(), 500);
+                this.saveGameData();
+            }
+
+            restartLevel() {
+                this.stopGameTimer();
+                this.closeModal('gameover-modal');
+                this.closeModal('level-modal');
+                this.applyLevelConfig();
+                this.score = 0;
+                this.combo = 0;
+                this.createBoard();
+                this.renderBoard();
+                this.updateUI();
+                this.startGameTimer();
+                setTimeout(() => this.checkAndClearMatches(), 500);
+            }
+
+            // ==================== AUTH ====================
+            handleGoogleLogin(response) {
+                const credential = response.credential;
+                const payload = JSON.parse(atob(credential.split('.')[1]));
+
+                this.user = {
+                    id: payload.sub,
+                    name: payload.name,
+                    email: payload.email,
+                    picture: payload.picture
+                };
+
+                document.getElementById('user-section').classList.remove('hidden');
+                document.getElementById('user-avatar').src = this.user.picture;
+                document.getElementById('login-btn').classList.add('hidden');
+
+                this.closeModal('login-modal');
+                this.loadUserProgress();
+                this.showToast(`Welcome, ${this.user.name}!`);
+            }
+
+            showLogin() {
+                this.showModal('login-modal');
+            }
+
+            // ==================== LEADERBOARD ====================
+            async showLeaderboard() {
+                this.showModal('leaderboard-modal');
+                await this.loadLeaderboard('alltime');
+            }
+
+            async loadLeaderboard(type) {
+                const list = document.getElementById('leaderboard-list');
+                list.innerHTML = '<div class="flex justify-center p-8"><div class="spinner"></div></div>';
+
+                const data = await this.api.getLeaderboard(type);
+
+                list.innerHTML = data.map((entry, i) => `
+                    <div class="leaderboard-item rank-${i + 1}">
+                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center font-bold text-sm mr-3">${entry.rank}</div>
+                        <img src="${entry.avatar}" class="w-10 h-10 rounded-full mr-3 bg-white/10" alt="">
+                        <div class="flex-1">
+                            <p class="font-bold text-sm">${entry.name}</p>
+                            <p class="text-xs text-white/50">Level ${entry.level}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="font-display text-lg text-yellow-300">${entry.score.toLocaleString()}</p>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            switchLeaderboardTab(type) {
+                document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+                event.target.classList.add('active');
+                this.loadLeaderboard(type);
+            }
+
+            // ==================== SETTINGS ====================
+            showSettings() {
+                this.showModal('settings-modal');
+            }
+
+            toggleSound() {
+                this.soundEnabled = !this.soundEnabled;
+                this.audio.enabled = this.soundEnabled;
+                document.getElementById('sound-btn').textContent = this.soundEnabled ? '🔊' : '🔇';
+                this.updateToggleBtn('settings-sound', this.soundEnabled);
+            }
+
+            toggleMusic() {
+                this.musicEnabled = !this.musicEnabled;
+                this.updateToggleBtn('settings-music', this.musicEnabled);
+            }
+
+            toggleVibration() {
+                this.vibrationEnabled = !this.vibrationEnabled;
+                this.updateToggleBtn('settings-vibration', this.vibrationEnabled);
+            }
+
+            updateToggleBtn(id, enabled) {
+                const btn = document.getElementById(id);
+                const dot = btn.querySelector('div');
+                if (enabled) {
+                    btn.classList.remove('bg-gray-600');
+                    btn.classList.add('bg-green-500');
+                    dot.style.transform = 'translateX(0)';
+                } else {
+                    btn.classList.remove('bg-green-500');
+                    btn.classList.add('bg-gray-600');
+                    dot.style.transform = 'translateX(-24px)';
+                }
+            }
+
+            // ==================== SAVE/LOAD ====================
+            saveGameData() {
+                const data = {
+                    score: this.score,
+                    level: this.level,
+                    moves: this.moves,
+                    target: this.target,
+                    coins: this.coins,
+                    lives: this.lives,
+                    boosts: this.boosts,
+                    levelStars: this.levelStars,
+                    dailyStreak: this.dailyStreak,
+                    lastDailyClaim: this.lastDailyClaim,
+                    achievements: this.achievements,
+                    timestamp: Date.now()
+                };
+
+                localStorage.setItem('candy_crush_progress', JSON.stringify(data));
+
+                if (this.user) {
+                    this.api.saveScore(this.user.id, this.score, this.level);
+                    this.api.saveProgress(this.user.id, data);
+                }
+            }
+
+            async loadUserProgress() {
+                if (!this.user) return;
+                const progress = await this.api.getProgress(this.user.id);
+                if (progress) {
+                    this.level = progress.level || 1;
+                    this.coins = progress.coins || 100;
+                    this.lives = progress.lives !== undefined ? progress.lives : 5;
+                    this.boosts = progress.boosts || this.boosts;
+                    this.levelStars = progress.levelStars || {};
+                    this.dailyStreak = progress.dailyStreak || 0;
+                    this.lastDailyClaim = progress.lastDailyClaim || 0;
+                    this.achievements = progress.achievements || [];
+                    this.applyLevelConfig();
+                    this.updateUI();
+                }
+            }
+
+            resetProgress() {
+                if (confirm('Are you sure? This will erase ALL 2000 levels of progress!')) {
+                    localStorage.removeItem('candy_crush_progress');
+                    this.level = 1;
+                    this.score = 0;
+                    this.moves = 30;
+                    this.target = 1000;
+                    this.coins = 100;
+                    this.lives = 5;
+                    this.boosts = { hammer: 3, shuffle: 2, bomb: 1, extraMoves: 2 };
+                    this.levelStars = {};
+                    this.dailyStreak = 0;
+                    this.lastDailyClaim = 0;
+                    this.achievements = [];
+                    this.applyLevelConfig();
+                    this.createBoard();
+                    this.renderBoard();
+                    this.updateUI();
+                    this.closeModal('settings-modal');
+                    this.showToast('All progress reset!');
+                }
+            }
+
+            // ==================== UI ====================
+            updateUI() {
+                const config = this.levelSystem.getLevel(this.level);
+
+                document.getElementById('score-display').textContent = this.score.toLocaleString();
+                document.getElementById('level-display').textContent = this.level;
+                document.getElementById('moves-display').textContent = this.moves;
+                document.getElementById('target-display').textContent = this.target.toLocaleString();
+                document.getElementById('coins-display').textContent = this.coins;
+                document.getElementById('lives-display').textContent = this.lives;
+
+                document.getElementById('world-name').textContent = config.worldName;
+                document.getElementById('level-type-name').textContent = `${config.typeEmoji} ${config.typeName}`;
+                document.getElementById('level-stars-display').textContent = `${this.levelStars[this.level] || 0}/3`;
+
+                document.getElementById('hammer-count').textContent = this.boosts.hammer;
+                document.getElementById('shuffle-count').textContent = this.boosts.shuffle;
+                document.getElementById('bomb-count').textContent = this.boosts.bomb;
+                document.getElementById('moves-count').textContent = this.boosts.extraMoves;
+
+                document.getElementById('boost-hammer').disabled = this.boosts.hammer <= 0;
+                document.getElementById('boost-shuffle').disabled = this.boosts.shuffle <= 0;
+                document.getElementById('boost-bomb').disabled = this.boosts.bomb <= 0;
+                document.getElementById('boost-moves').disabled = this.boosts.extraMoves <= 0;
+
+                const progress = Math.min((this.score / this.target) * 100, 100);
+                document.getElementById('progress-bar').style.width = `${progress}%`;
+                document.getElementById('progress-text').textContent = `${Math.floor(progress)}%`;
+
+                if (this.lives >= this.maxLives) {
+                    document.getElementById('lives-timer').classList.add('hidden');
+                }
+            }
+
+            showModal(id) {
+                document.getElementById(id).classList.add('active');
+            }
+
+            closeModal(id) {
+                document.getElementById(id).classList.remove('active');
+            }
+
+            showToast(message) {
+                const existing = document.querySelector('.toast');
+                if (existing) existing.remove();
+
+                const toast = document.createElement('div');
+                toast.className = 'toast';
+                toast.textContent = message;
+                document.body.appendChild(toast);
+
+                requestAnimationFrame(() => toast.classList.add('show'));
+                setTimeout(() => {
+                    toast.classList.remove('show');
+                    setTimeout(() => toast.remove(), 300);
+                }, 3000);
+            }
+
+            createBackgroundParticles() {
+                const container = document.getElementById('bg-particles');
+                const shapes = ['🍬', '🍭', '🍫', '🍩'];
+
+                for (let i = 0; i < 15; i++) {
+                    const el = document.createElement('div');
+                    el.textContent = shapes[Math.floor(Math.random() * shapes.length)];
+                    el.style.position = 'absolute';
+                    el.style.left = Math.random() * 100 + '%';
+                    el.style.top = Math.random() * 100 + '%';
+                    el.style.fontSize = (20 + Math.random() * 30) + 'px';
+                    el.style.opacity = '0.1';
+                    el.style.animation = `floating ${3 + Math.random() * 4}s ease-in-out infinite`;
+                    el.style.animationDelay = Math.random() * 2 + 's';
+                    container.appendChild(el);
+                }
+            }
+
+            setupEventListeners() {
+                document.querySelectorAll('.modal-overlay').forEach(modal => {
+                    modal.addEventListener('click', (e) => {
+                        if (e.target === modal) modal.classList.remove('active');
+                    });
+                });
+
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape') {
+                        document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
+                    }
+                });
+            }
+        }
+
+        const game = new CandyCrushGame();
+        window.game = game;
+    </script>
+</body>
+</html>
